@@ -1,5 +1,7 @@
 # NJ Scratch-Off Tracker
 
+**Live site:** https://madramdesign.github.io/nj-scratch/ (updates every 6 hours)
+
 A data-driven dashboard that answers one question:
 
 > **Which currently active New Jersey scratch-off games have the strongest remaining-prize profile, relative to their cost and to the other games available right now?**
@@ -61,6 +63,10 @@ npm test
 ```bash
 npm run typecheck
 ```
+
+## Hosting (GitHub Pages)
+
+`.github/workflows/update-and-deploy.yml` runs every 6 hours (and on every push to `main`). It restores the SQLite history from the `data` branch, fetches the official NJ data, runs the tests, saves the database back to `data`, exports the API as static JSON (`apps/api/src/export-static.ts`) and deploys to Pages. In the hosted build (`VITE_STATIC=1`), custom weights are re-scored in the browser, the watchlist is stored in the browser, and the manual refresh button is replaced by the automatic schedule. To run an update right away: **Actions → Update data & deploy site → Run workflow**.
 
 ## Updating data
 
