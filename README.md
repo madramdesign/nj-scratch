@@ -68,6 +68,22 @@ npm run typecheck
 
 `.github/workflows/update-and-deploy.yml` runs every 6 hours (and on every push to `main`). It restores the SQLite history from the `data` branch, fetches the official NJ data, runs the tests, saves the database back to `data`, exports the API as static JSON (`apps/api/src/export-static.ts`) and deploys to Pages. In the hosted build (`VITE_STATIC=1`), custom weights are re-scored in the browser, the watchlist is stored in the browser, and the manual refresh button is replaced by the automatic schedule. To run an update right away: **Actions → Update data & deploy site → Run workflow**.
 
+**Backups:** every run adds a commit to the `data` branch, so each earlier copy of the database is kept. A copy that fails SQLite's integrity check or has fewer history rows than the previous backup is never saved (`packages/scraper/src/verify-db.ts`), and the run fails instead. To restore an earlier copy:
+
+```bash
+git fetch origin data
+```
+
+```bash
+git log --oneline FETCH_HEAD
+```
+
+```bash
+git show <commit>:njscratch.db > data/njscratch.db
+```
+
+To put a restored copy back online, commit it on top of the `data` branch and push.
+
 ## Updating data
 
 - **Automatic:** the API process checks njlottery.com every `UPDATE_INTERVAL_HOURS` (default 6), and right away on startup if the last check is older than that. Failures retry after 30 minutes. Identical responses are logged as `unchanged`.

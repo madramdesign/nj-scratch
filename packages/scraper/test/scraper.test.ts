@@ -157,3 +157,47 @@ describe('backfill helpers', () => {
     expect(captureTime('20250811014117')).toBe(Date.UTC(2025, 7, 11, 1, 41, 17));
   });
 });
+
+describe('verifyDatabase (backup safety check)', async () => {
+  const { mkdtempSync, writeFileSync, copyFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { verifyDatabase } = await import('../src/verify-db.ts');
+
+  function fileDb(dir: string, name: string, runs: number) {
+    const path = join(dir, name);
+    const db = openDatabase(path);
+    for (let i = 0; i < runs; i++) {
+      const games = baseGames();
+      games[0].prizeTiers[0].paidTickets += i; // make each run a real data change
+      ingestPayload(db, { body: body(games), observedAt: now + i * 3600_000, source: 'official', trigger: 'test' });
+    }
+    db.close();
+    return path;
+  }
+
+  it('accepts a healthy copy that grew since the previous backup', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'njv-'));
+    const prev = fileDb(dir, 'prev.db', 1);
+    const next = fileDb(dir, 'next.db', 2);
+    expect(verifyDatabase(next, prev)).toEqual([]);
+    expect(verifyDatabase(next, join(dir, 'missing.db'))).toEqual([]);
+  });
+
+  it('rejects a copy that lost history rows', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'njv-'));
+    const prev = fileDb(dir, 'prev.db', 2);
+    const next = fileDb(dir, 'next.db', 1);
+    expect(verifyDatabase(next, prev).join('\n')).toMatch(/update_runs shrank from 2 to 1/);
+  });
+
+  it('rejects a missing, empty or corrupt file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'njv-'));
+    expect(verifyDatabase(join(dir, 'nope.db'))).toEqual([expect.stringMatching(/does not exist/)]);
+    expect(verifyDatabase(fileDb(dir, 'empty.db', 0))).toContain('update_runs is empty');
+    const bad = join(dir, 'bad.db');
+    copyFileSync(fileDb(dir, 'good.db', 1), bad);
+    writeFileSync(bad, Buffer.alloc(4096, 7), { flag: 'r+' });
+    expect(verifyDatabase(bad).length).toBeGreaterThan(0);
+  });
+});
