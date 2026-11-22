@@ -6,4 +6,5 @@ import { backfillFromArchive } from './backfill.ts';
 const db = openDatabase();
 const results = await backfillFromArchive(db);
 const ok = results.filter((r) => r.status === 'success').length;
+db.close();
 console.log(`[backfill] imported ${ok} new snapshots (${results.length} captures checked).`);

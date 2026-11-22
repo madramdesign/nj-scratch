@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiSend } from '../api';
+import { IS_STATIC } from '../static';
 import { useGames } from '../data';
 import { dateTime, relativeTime } from './ui';
 
@@ -38,9 +39,13 @@ export function StatusBar() {
       ))}
       <span className="status-actions">
         <Link to="/data">Details</Link>
-        <button type="button" className="btn small" onClick={refresh} disabled={busy} title="Fetch the latest data from njlottery.com (admin/dev)">
-          {busy ? 'Refreshing…' : '↻ Refresh data'}
-        </button>
+        {IS_STATIC ? (
+          <span className="muted small">Updates automatically every 6 hours</span>
+        ) : (
+          <button type="button" className="btn small" onClick={refresh} disabled={busy} title="Fetch the latest data from njlottery.com (admin/dev)">
+            {busy ? 'Refreshing…' : '↻ Refresh data'}
+          </button>
+        )}
       </span>
       {msg && <span className="status-msg">{msg}</span>}
     </div>

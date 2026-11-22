@@ -22,7 +22,7 @@ export function Watchlist() {
   return (
     <>
       <h2 className="page-title">★ Watchlist</h2>
-      <p className="lede">Track games with the ☆ star anywhere in the app. Alerts list notable changes (top or major prizes claimed, score moves of 5+ points, profile changes) detected in the official data.</p>
+      <p className="lede">Track games with the ☆ star anywhere in the app. Your watchlist is saved in this browser. Alerts list notable changes (top or major prizes claimed, score moves of 5+ points, profile changes) detected in the official data.</p>
       {items.length === 0 ? (
         <div className="panel">No games tracked yet. Star a game from <Link to="/">Best Tickets</Link> or any table.</div>
       ) : (

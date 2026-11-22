@@ -1,0 +1,81 @@
+name: Update data & deploy site
+
+# Every 6 hours: restore the SQLite history from the `data` branch, fetch the official
+# NJ Lottery data, save the database back, export static JSON, and deploy to GitHub Pages.
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update-and-deploy
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Restore database from the data branch
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin data; then
+            git show FETCH_HEAD:njscratch.db > data/njscratch.db
+            ls -l data/njscratch.db
+          else
+            echo "No data branch yet; starting a new database."
+          fi
+
+      - name: Backfill history from the Internet Archive (first run only)
+        run: '[ -s data/njscratch.db ] || npm run backfill'
+
+      - name: Fetch the latest official NJ Lottery data
+        run: npm run scrape || echo "::warning::Update failed. The site keeps the last good data and shows a staleness warning."
+
+      - name: Run tests
+        run: npm test
+
+      - name: Save database to the data branch
+        run: |
+          tmp=$(mktemp -d)
+          cp data/njscratch.db "$tmp/"
+          cd "$tmp"
+          git init -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add njscratch.db
+          git commit -qm "Database snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+
+      - name: Build static site
+        run: |
+          VITE_STATIC=1 VITE_BASE="/${{ github.event.repository.name }}/" npm run -w @nj/web build
+          npx tsx apps/api/src/export-static.ts apps/web/dist
+          cp apps/web/dist/index.html apps/web/dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -9,4 +9,5 @@ if (result.report) {
   const r = result.report;
   console.log(`[scrape] games=${r.totalGames} active=${r.activeGames} rankable=${r.rankableActiveGames} invalid=${r.invalidActiveGames}`);
 }
+db.close();
 process.exit(result.status === 'failed' ? 1 : 0);

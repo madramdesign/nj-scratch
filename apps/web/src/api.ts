@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameMetrics, GameScore, Explanation, TierAnalysis, ComponentKey } from '@nj/analytics';
 import type { DataIssue, NormalizedGame } from '@nj/lottery-data/types';
+import { IS_STATIC, staticGet, staticSend } from './static';
 
 export type GameSummary = Omit<GameMetrics, 'tiers'> & {
   score: GameScore;
@@ -113,6 +114,7 @@ export interface WatchItem {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
+  if (IS_STATIC) return staticGet(path) as Promise<T>;
   const res = await fetch(path);
   const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
   if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -120,6 +122,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 }
 
 export async function apiSend<T>(method: 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  if (IS_STATIC) return staticSend(method, path) as Promise<T>;
   const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   const json = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
