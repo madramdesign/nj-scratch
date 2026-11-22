@@ -1,0 +1,9 @@
+{
+  "name": "@nj/scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": { "@nj/lottery-data": "*", "@nj/analytics": "*", "@nj/database": "*" }
+}
