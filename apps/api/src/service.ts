@@ -1,4 +1,4 @@
-import { analyzeGames, COMPONENTS, DEFAULT_MAJOR_THRESHOLD_CENTS, DEFAULT_WEIGHTS, MAJOR_THRESHOLDS_CENTS, normalizeWeights, type AnalyzedGame, type Weights } from '@nj/analytics';
+import { analyzeGames, buildCalendar, COMPONENTS, DEFAULT_MAJOR_THRESHOLD_CENTS, DEFAULT_WEIGHTS, MAJOR_THRESHOLDS_CENTS, normalizeWeights, type AnalyzedGame, type Weights } from '@nj/analytics';
 import {
   dbStats, gameHistory, getWatchlist, lastRunWithStatus, latestDataRun, listEvents, listRuns, loadRunGames, SOURCES, type DB, type RunRow,
 } from '@nj/database';
@@ -106,6 +106,12 @@ export class DashboardService {
       .prepare(`SELECT game_id, MAX(observed_at) AS last, SUM(CASE WHEN observed_at >= ? THEN 1 ELSE 0 END) AS n FROM change_events WHERE kind != 'game_added' GROUP BY game_id`)
       .all(since) as Array<{ game_id: string; last: number; n: number }>;
     return new Map(rows.map((r) => [r.game_id, { last: r.last, count: r.n }]));
+  }
+
+  /** Upcoming launches, end of sales and claim deadlines for the games in the latest data. */
+  calendar() {
+    const games = this.loadCurrent()?.games ?? [];
+    return { now: this.now(), ...buildCalendar(games, this.now()) };
   }
 
   history(id: string) {

@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { KNOWN_TIER_TYPES, TIER_TYPE, type RawGame, type RawPrizeTier } from './raw-schema.ts';
-import type { DataIssue, GameStatus, NormalizedGame, NormalizedTier, PrizeKind } from './types.ts';
+import { CLAIM_WINDOW_MS, type DataIssue, type GameStatus, type NormalizedGame, type NormalizedTier, type PrizeKind } from './types.ts';
 
 /** NJ Lottery counts remaining prizes >= $600 from claim-center claims, and smaller ones from paid tickets. */
 export const CLAIM_CENTER_THRESHOLD_CENTS = 60_000;
-const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const YEAR_MS = CLAIM_WINDOW_MS;
 
 /**
  * Same windows the official scratch-offs page uses (instantgames.js):

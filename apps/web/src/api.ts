@@ -152,3 +152,5 @@ export function useApi<T>(path: string | null) {
   useEffect(load, [load]);
   return { data, error, loading, reload: load };
 }
+
+export type { Calendar } from '@nj/analytics';

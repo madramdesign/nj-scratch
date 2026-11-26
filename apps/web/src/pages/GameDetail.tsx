@@ -4,6 +4,8 @@ import { useApi, type GameDetailResponse, type HistoryPoint } from '../api';
 import { useSettings } from '../settings';
 import { dateOnly, ErrorBox, Est, Loading, Retention, ScoreBadge, Star } from '../components/ui';
 import { HistoryChart, PrizeDistributionChart, fmtMoneyCompact } from '../components/Charts';
+import { SessionOdds } from '../components/SessionOdds';
+import { Alternatives } from '../components/Alternatives';
 
 function Stat({ label, value, est, sub }: { label: string; value: React.ReactNode; est?: boolean; sub?: React.ReactNode }) {
   return (
@@ -110,6 +112,8 @@ export function GameDetailPage() {
         )}
       </section>
 
+      <Alternatives game={g} />
+
       <section className="panel">
         <h3 className="section-title">Key numbers</h3>
         <dl className="stats-grid">
@@ -140,6 +144,8 @@ export function GameDetailPage() {
           published cash value. Prizes won but not yet claimed still count as “remaining”, which can overstate EV.
         </p>
       </section>
+
+      <SessionOdds g={g} />
 
       <section className="panel" aria-labelledby="pt-h">
         <h3 id="pt-h" className="section-title">Prize table</h3>

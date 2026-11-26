@@ -199,6 +199,18 @@ describe('change detection', () => {
     expect(events.some((e) => e.kind === 'structure_changed' && /increased/.test(e.message))).toBe(true);
   });
 
+  it('reports when the last top prize is claimed, once', () => {
+    const raw = referenceGame({ now });
+    raw.prizeTiers[3].claimedTickets = 9;
+    const before = norm(raw);
+    raw.prizeTiers[3].claimedTickets = 10;
+    const soldOut = diffGame(before, norm(raw)).filter((e) => e.kind === 'top_prize_sold_out');
+    expect(soldOut).toHaveLength(1);
+    expect(soldOut[0].severity).toBe('warning');
+    expect(soldOut[0].message).toMatch(/^Last \$10,000 top prize claimed; none remain/);
+    expect(diffGame(norm(raw), norm(raw)).some((e) => e.kind === 'top_prize_sold_out')).toBe(false);
+  });
+
   it('reports significant score changes only', () => {
     expect(scoreChangeEvent('1', 82, 76)?.message).toBe('Score decreased from 82 → 76.');
     expect(scoreChangeEvent('1', 82, 80)).toBeNull();

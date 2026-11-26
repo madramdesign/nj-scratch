@@ -1,7 +1,22 @@
 import { formatInt, formatMoney } from '@nj/lottery-data/format';
 import type { NormalizedGame } from '@nj/lottery-data/types';
 
-export type ChangeKind = 'prizes_claimed' | 'top_prize_claimed' | 'major_prize_claimed' | 'structure_changed' | 'score_changed' | 'game_added' | 'game_removed' | 'status_changed';
+export type ChangeKind =
+  | 'prizes_claimed'
+  | 'top_prize_claimed'
+  | 'top_prize_sold_out'
+  | 'major_prize_claimed'
+  | 'structure_changed'
+  | 'score_changed'
+  | 'game_added'
+  | 'status_changed'
+  | 'game_announced';
+
+/**
+ * Bump when the kinds or wording of derived events change. The scrape CLI rebuilds all stored change
+ * events once when the database was built with an older version.
+ */
+export const EVENTS_VERSION = 2;
 
 export interface ChangeEvent {
   gameId: string;
@@ -55,10 +70,21 @@ export function diffGame(prev: NormalizedGame, curr: NormalizedGame, majorThresh
       events.push({ gameId: curr.gameId, kind: 'structure_changed', severity: 'warning', tierNumber: p.tierNumber, message: `Prize tier ${p.description} disappeared from the official data.` });
     }
   }
+  // All top prizes gone: the game keeps selling, but the advertised top prize can no longer be won.
+  const topLeft = (g: NormalizedGame) => {
+    const max = Math.max(0, ...g.tiers.map((t) => t.prizeCents));
+    return g.tiers.filter((t) => t.prizeCents === max).reduce((n, t) => n + t.remaining, 0);
+  };
+  if (topLeft(prev) > 0 && topLeft(curr) === 0 && curr.tiers.length) {
+    const top = curr.tiers.find((t) => t.prizeCents === maxCents)!;
+    events.push({ gameId: curr.gameId, kind: 'top_prize_sold_out', severity: 'warning', message: `Last ${top.description} top prize claimed; none remain, but the game may still be on sale.` });
+  }
   if (smallClaimed > 0) {
     events.push({ gameId: curr.gameId, kind: 'prizes_claimed', severity: 'info', delta: smallClaimed, message: `${formatInt(smallClaimed)} smaller prizes (under $600) paid.` });
   }
-  if (prev.status !== curr.status) {
+  if (prev.status === 'upcoming' && curr.status === 'active') {
+    events.push({ gameId: curr.gameId, kind: 'game_added', severity: 'notable', message: `New game on sale: ${curr.name} (${curr.gameNumber}).` });
+  } else if (prev.status !== curr.status) {
     events.push({ gameId: curr.gameId, kind: 'status_changed', severity: 'notable', message: `Status changed from ${prev.status} to ${curr.status}.` });
   }
   return events;
@@ -75,4 +101,14 @@ export function scoreChangeEvent(gameId: string, prev: number | null, curr: numb
     delta: d,
     message: `Score ${d > 0 ? 'increased' : 'decreased'} from ${prev.toFixed(0)} → ${curr.toFixed(0)}.`,
   };
+}
+
+/** Event for a game seen for the first time (null when nothing is worth reporting). */
+export function firstSeenEvent(g: NormalizedGame): ChangeEvent | null {
+  if (g.status === 'active') return { gameId: g.gameId, kind: 'game_added', severity: 'notable', message: `New game added: ${g.name} (${g.gameNumber}).` };
+  if (g.status === 'upcoming') {
+    const when = g.launchDate ? new Date(g.launchDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }) : 'soon';
+    return { gameId: g.gameId, kind: 'game_announced', severity: 'notable', message: `New ${formatMoney(g.priceCents)} game announced: ${g.name} (${g.gameNumber}), launching ${when}.` };
+  }
+  return null;
 }

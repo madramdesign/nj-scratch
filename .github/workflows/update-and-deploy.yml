@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
   pages: write
   id-token: write
 
@@ -52,6 +53,29 @@ jobs:
       - name: Fetch the latest official NJ Lottery data
         run: npm run scrape || echo "::warning::Update failed. The site keeps the last good data and shows a staleness warning."
 
+      # Opens (or updates) one issue labeled `pipeline-health` while updates fail or the data is stale,
+      # and closes it once a check passes again. Never fails the job itself.
+      - name: Report pipeline health
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          npx tsx packages/scraper/src/health.ts --markdown "$RUNNER_TEMP/health.md"
+          unhealthy=$?
+          set -e
+          open=$(gh issue list --label pipeline-health --state open --json number --jq '.[0].number // empty' || true)
+          if [ "$unhealthy" -ne 0 ]; then
+            echo "::warning::Data pipeline needs attention (see the pipeline-health issue)."
+            if [ -n "$open" ]; then
+              gh issue edit "$open" --body-file "$RUNNER_TEMP/health.md"
+            else
+              gh label create pipeline-health --color B60205 --description "Opened automatically when data updates fail" --force
+              gh issue create --title "Data pipeline needs attention" --label pipeline-health --body-file "$RUNNER_TEMP/health.md"
+            fi
+          elif [ -n "$open" ]; then
+            gh issue close "$open" --comment "$(cat "$RUNNER_TEMP/health.md")"
+          fi
+
       - name: Run tests
         run: npm test
 
@@ -68,13 +92,17 @@ jobs:
           commit=$(git commit-tree "$tree" ${DATA_PARENT:+-p "$DATA_PARENT"} -m "Database snapshot $(date -u +%Y-%m-%dT%H:%MZ)")
           git push origin "$commit:refs/heads/data"
 
+      - id: pages
+        uses: actions/configure-pages@v6
+
       - name: Build static site
+        env:
+          # Absolute links in the feeds (feed.xml, feed.json, feeds/price-<dollars>.xml).
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
         run: |
           VITE_STATIC=1 VITE_BASE="/${{ github.event.repository.name }}/" npm run -w @nj/web build
           npx tsx apps/api/src/export-static.ts apps/web/dist
           cp apps/web/dist/index.html apps/web/dist/404.html
-
-      - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -4,9 +4,12 @@ import { formatMoney } from '@nj/lottery-data/format';
 import { useApi, type ChangeEventRow } from '../api';
 import { useGames } from '../data';
 import { dateOnly, dateTime, ErrorBox, Loading, relativeTime } from '../components/ui';
+import { Subscribe } from '../components/Subscribe';
 
 const KINDS: Record<string, string> = {
   top_prize_claimed: 'Top prizes claimed',
+  top_prize_sold_out: 'Top prizes sold out',
+  game_announced: 'Announced games',
   major_prize_claimed: 'Major prizes claimed',
   score_changed: 'Score changes',
   prizes_claimed: 'Other prizes',
@@ -16,9 +19,11 @@ const KINDS: Record<string, string> = {
 };
 
 export function Changes() {
-  const { data, error, loading } = useApi<{ events: ChangeEventRow[] }>('/api/changes?limit=1000');
   const { status } = useGames();
   const [kind, setKind] = useState<string>('notable');
+  // Notable events are a few per update, so far more history fits; "all" includes ~100 small-prize events per update.
+  const needsAll = kind === 'all' || kind === 'prizes_claimed';
+  const { data, error, loading } = useApi<{ events: ChangeEventRow[] }>(needsAll ? '/api/changes?limit=1000' : '/api/changes?notable=1&limit=5000');
   const events = useMemo(() => {
     const all = data?.events ?? [];
     if (kind === 'all') return all;
@@ -43,6 +48,7 @@ export function Changes() {
           <button key={k} type="button" className={`chip ${k === kind ? 'on' : ''}`} aria-pressed={k === kind} onClick={() => setKind(k)}>{label}</button>
         ))}
       </div>
+      <Subscribe />
       {groups.length === 0 && <p className="muted">No changes recorded for this filter.</p>}
       {groups.map(([t, list]) => (
         <section key={t} className="panel">
@@ -50,7 +56,7 @@ export function Changes() {
           <ul className="event-list">
             {list.slice(0, 150).map((e) => (
               <li key={e.id} className={`event event-${e.severity}`}>
-                <Link to={`/game/${e.game_id}`}>{e.game_name ?? e.game_id}</Link>
+                <Link to={e.kind === 'game_announced' ? '/calendar' : `/game/${e.game_id}`}>{e.game_name ?? e.game_id}</Link>
                 {e.price_cents ? <span className="muted"> ({formatMoney(e.price_cents)})</span> : null}: {e.message}
               </li>
             ))}

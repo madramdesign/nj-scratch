@@ -4,6 +4,7 @@ import { useApi, type ChangeEventRow, type WatchItem } from '../api';
 import { useSettings } from '../settings';
 import { useWatchlist } from '../watchlist';
 import { dateOnly, ErrorBox, GameLink, Loading, ScoreBadge, Star } from '../components/ui';
+import { Subscribe } from '../components/Subscribe';
 
 function Delta({ curr, prev }: { curr: number | null | undefined; prev: number | null | undefined }) {
   if (curr == null || prev == null) return <span className="muted">—</span>;
@@ -75,8 +76,9 @@ export function Watchlist() {
             ))}
           </ul>
         )}
-        <p className="muted small">Browser/email notifications aren’t implemented yet; alerts are recorded on every update and shown here.</p>
+        <p className="muted small">Alerts are recorded on every update and shown here. To be notified without visiting, follow a feed below.</p>
       </section>
+      <Subscribe />
     </>
   );
 }
