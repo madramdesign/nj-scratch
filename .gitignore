@@ -3,3 +3,9 @@ dist
 data/*.db
 data/*.db-*
 .DS_Store
+
+# iOS (project is generated from apps/ios/project.yml)
+apps/ios/build
+apps/ios/NJScratch.xcodeproj
+apps/ios/NJScratch/Resources/Info.plist
+xcuserdata
