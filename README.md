@@ -129,6 +129,7 @@ Scoring options on any analysis endpoint: `?major=<dollars>` and `?w=expectedRet
 ```
 apps/api            Hono API, scheduler, serves built web app
 apps/web            React dashboard
+apps/ios            native iPhone/iPad app (SwiftUI) that reads the published JSON; see apps/ios/README.md
 packages/lottery-data   official API schema, normalization, validation, formatting
 packages/analytics      metrics, EV, ticket estimate, scoring, explanations, change detection
 packages/database       SQLite schema, migrations, repository
