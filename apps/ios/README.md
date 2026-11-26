@@ -55,6 +55,28 @@ The calendar and the notable-changes file appear on the live site once the Phase
 - the Calendar tab says it isn't published yet;
 - Changes falls back to filtering `changes.json`.
 
+## Releasing to TestFlight
+
+These steps use the "ROBERT MEKITA" team (`G2E45NC5BZ`) with automatic signing. The App Store Connect app record for `com.madramdesign.NJScratch` already exists.
+
+1. Raise the build number in `project.yml`: `CURRENT_PROJECT_VERSION` must go up with every upload. Raise `MARKETING_VERSION` when you release a new version.
+2. Regenerate the project and archive:
+
+   ```bash
+   xcodegen generate && xcodebuild -project NJScratch.xcodeproj -scheme NJScratch -configuration Release -destination 'generic/platform=iOS' -archivePath build/NJScratch.xcarchive -allowProvisioningUpdates archive
+   ```
+
+3. Upload. Use an `ExportOptions.plist` with `method` set to `app-store-connect`, `destination` set to `upload`, and `teamID` set to `G2E45NC5BZ`:
+
+   ```bash
+   xcodebuild -exportArchive -archivePath build/NJScratch.xcarchive -exportOptionsPlist build/ExportOptions-upload.plist -exportPath build/upload -allowProvisioningUpdates
+   ```
+
+Builds appear under **TestFlight** in App Store Connect after Apple finishes processing them, usually within 5–30 minutes.
+
+- **Internal testers** (members of your App Store Connect team) can install a build right away.
+- **External testers** need Beta App Review first. That requires a privacy policy URL, a beta description and test notes.
+
 ## App Store checklist
 
 Already in place:
