@@ -44,6 +44,7 @@ All of these are implemented and tested. Do not propose them as new.
 | Hosting | Static export via the real Hono routes; in-browser re-scoring for custom weights; localStorage watchlist | `apps/api/src/export-static.ts`, `apps/web/src/static.ts` |
 | Ops | Every DB copy kept as a commit on `data`; integrity and row-count checks before backup; staleness banner | `.github/workflows/update-and-deploy.yml`, `packages/scraper/src/verify-db.ts` |
 | Phase 1 (2026-11-25) | Notable-change feeds (Atom/JSON, per price); pipeline-health issue; top-prizes-gone list and `top_prize_sold_out` events; Launches & Deadlines page with announced games; "buy N tickets" chances; same-price alternatives; notable-only change export | see FEATURE_BACKLOG "Phase 1 implementation notes" |
+| iOS app (2026-11-25) | Native SwiftUI app for iPhone and iPad reading the published JSON: rankings, game detail with calculator, calendar, changes, watchlist; offline cache; submitted to App Review | `apps/ios` (see its README) |
 | API (self-hosted mode) | REST endpoints, manual refresh with cooldown and optional bearer token, in-process scheduler | `apps/api/src/{app,scheduler}.ts` |
 
 ## 3. Architecture summary
@@ -537,7 +538,7 @@ graph LR
 | Hot/cold "game temperature" (F37) | **Reject** | Gambler's fallacy. Each ticket's odds depend on remaining counts, which we already show, not on "streaks". It contradicts the project's honesty positioning. |
 | Natural-language chatbot (F33) | **Reject** | A filter over ~65 rows answers it exactly. Needs a backend or key. Hallucination and persuasion risk. |
 | Ticket scanning / OCR (F34) | **Reject** | The official app already checks winners. No analytic value. Liability if wrong. |
-| Native iOS/Android apps (F36) | **Reject** | Google Play explicitly bans odds-tracking "companion" apps; Apple 5.3 is risky. A PWA (F13) covers it. |
+| Native iOS/Android apps (F36) | **iOS: built and submitted (2026-11-25). Android: reject** | Google Play explicitly bans odds-tracking "companion" apps. Apple 5.3 is a review risk; the iOS app is information-only with responsible-play safeguards (FEATURE-035). |
 | Accounts & cross-device sync (F35) | **Reject (for now)** | Requires a server and stores personal gambling data. Export/import files cover the need. |
 | Retailer map (F21) | **Defer** | The NJ locations API has no inventory or "winning ticket sold here" data (fields null). "Lucky store" framing is fallacious. |
 | Second-chance value in EV (F20) | **Defer** | Value per entry is tiny and unpublished (drawing entries vary). It adds model noise. |
@@ -576,7 +577,7 @@ graph LR
 5. Append new sources to §23 with the date.
 6. Never delete rejected ideas. Move them to the rejected list with the reason.
 
-**Last reviewed:** 2026-11-25 (Phase 1 built the same day).
+**Last reviewed:** 2026-11-25 (Phase 1 shipped and the iOS app submitted the same day).
 
 ## 22. Appendix: scoring script
 

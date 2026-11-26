@@ -6,7 +6,7 @@
 - **Status** is one of `Research`, `Ready`, `In progress`, `Shipped (<commit>)`, `Deferred`, `Rejected`.
 - **Priority** is P0, P1, P2 or Experimental.
 - **Score** is the weighted priority from FEATURE_RESEARCH §10, out of 10.
-- Last reviewed: 2026-11-25.
+- Last reviewed: 2026-11-25 (after Phase 1 and the iOS app shipped).
 
 ## Rules for every feature
 
@@ -22,7 +22,7 @@ These apply to every item below and are not repeated in each entry.
 
 ## FEATURE-001 (F02): Notable-changes feed (Atom + JSON Feed)
 
-Status: Built 2026-11-25 (Phase 1; not yet committed)
+Status: Shipped 2026-11-25 (PR #1)
 Priority: P0
 Category: Automation / Notifications
 Score: 8.25
@@ -78,10 +78,17 @@ Score: 8.25
 
 ## FEATURE-002 (F03): Push alerts via ntfy and Discord
 
-Status: Research
+Status: In progress. The iOS app's local notifications for starred games come first; ntfy and Discord follow.
 Priority: P0
 Category: Automation / Notifications
 Score: 7.85
+
+**Update (2026-11-25).** Now that there is a native iOS app (FEATURE-035), the first delivery channel is in the app:
+- background app refresh fetches `api/changes-notable.json`;
+- starred games' new top-prize, sold-out, major-prize and profile events become local notifications;
+- tapping a notification opens the game.
+
+This needs no server, no subscriber list and no secrets. The ntfy and Discord plan below still covers people who don't use the app.
 
 **Problem:** Feeds still require a reader. People want a phone notification.
 
@@ -132,7 +139,7 @@ Score: 7.85
 
 ## FEATURE-003 (F10): Zombie-game radar
 
-Status: Built 2026-11-25 (Phase 1; not yet committed)
+Status: Shipped 2026-11-25 (PR #1)
 Priority: P0
 Category: Data / UX (**EXISTING — IMPROVE**: the Avoid page)
 
@@ -180,7 +187,7 @@ Score: 7.72
 
 ## FEATURE-004 (F01): Upcoming, ending-soon and last-day-to-claim views
 
-Status: Built 2026-11-25 (Phase 1; not yet committed)
+Status: Shipped 2026-11-25 (PR #1)
 Priority: P0
 Category: Data / UX (**EXISTING — IMPROVE**: hidden capability)
 
@@ -233,7 +240,7 @@ Score: 7.63
 
 ## FEATURE-005 (F05): "Buy N tickets" probability calculator
 
-Status: Built 2026-11-25 (Phase 1; not yet committed)
+Status: Shipped 2026-11-25 (PR #1)
 Priority: P0
 Category: Analytics / Power user
 Score: 7.63
@@ -281,7 +288,7 @@ Score: 7.63
 
 ## FEATURE-006 (F24): Better alternative at the same price
 
-Status: Built 2026-11-25 (Phase 1; not yet committed)
+Status: Shipped 2026-11-25 (PR #1)
 Priority: P0
 Category: Recommendations (**EXISTING — IMPROVE**: `explain.ts` peer medians)
 
@@ -321,7 +328,7 @@ Score: 7.60
 
 ## FEATURE-007 (F04 + F28): Pipeline self-monitoring and anomaly alerts
 
-Status: Built 2026-11-25 (Phase 1; not yet committed)
+Status: Shipped 2026-11-25 (PR #1)
 Priority: P0
 Category: Reliability / Automation
 Score: 6.97 (F28: 6.35)
@@ -602,8 +609,8 @@ Score: 6.88
 
 ## FEATURE-013 (F13): Installable PWA
 
-Status: Ready
-Priority: P1
+Status: Ready (lower value now that the native iOS app exists; still useful for Android)
+Priority: P2
 Category: Mobile
 Score: 6.80
 
@@ -964,7 +971,7 @@ Score: 5.60
 
 ## FEATURE-022 (F27): Scalable change-event export
 
-Status: Built 2026-11-25 (Phase 1; not yet committed)
+Status: Shipped 2026-11-25 (PR #1)
 Priority: P0
 Category: Reliability
 Score: 6.17
@@ -1219,10 +1226,24 @@ Score: 3.55
 
 ## FEATURE-035 (F36): Native iOS/Android apps
 
-Status: Rejected
-Score: 3.92
+Status: **iOS shipped.** Built 2026-11-25 (PR #2), submitted to App Review the same day (version 1.0, build 2). Android is still rejected.
+Score: 3.92 (scored before the user decided to build it)
 
-**Reason:** Google Play explicitly bans odds-tracking companion apps, and Apple 5.3 is risky. The PWA (FEATURE-013) covers this.
+**History:** this was originally rejected: Google Play bans odds-tracking "companion" apps, and Apple's guideline 5.3 is a review risk. The user chose to build a native SwiftUI app anyway (`apps/ios`).
+
+Mitigations for 5.3:
+- information only: no ticket sales, wagers or purchase links;
+- a first-launch notice with 18+ and 1-800-GAMBLER;
+- expected loss shown next to every probability;
+- an 18+ age rating;
+- review notes explaining all of the above.
+
+Android stays rejected because of the Play policy; Android users have the website.
+
+**Follow-ups:**
+- the App Review outcome;
+- FEATURE-002 notifications in the app (in progress);
+- iPad-specific layouts, if usage warrants them.
 
 ---
 

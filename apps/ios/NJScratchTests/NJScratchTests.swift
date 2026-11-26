@@ -106,3 +106,45 @@ final class AlternativesAndFormatTests: XCTestCase {
         XCTAssertTrue(Alternatives.samePrice(for: list.games[0], in: list.games).isEmpty)
     }
 }
+
+final class NotificationSelectorTests: XCTestCase {
+    private func event(_ id: Int, _ game: String, _ kind: String, _ message: String, at: Double, name: String? = "Game", price: Int? = 1000) -> ChangeEvent {
+        let json: [String: Any?] = ["id": id, "game_id": game, "observed_at": at, "kind": kind, "severity": "notable", "message": message, "game_name": name, "price_cents": price]
+        let data = try! JSONSerialization.data(withJSONObject: json.compactMapValues { $0 })
+        return try! JSONDecoder().decode(ChangeEvent.self, from: data)
+    }
+
+    func testOnlyNewEventsForStarredGamesOfInterestingKinds() {
+        let events = [
+            event(1, "1972", "top_prize_claimed", "1 × $500,000 top prize claimed (1 left).", at: 100),
+            event(2, "1972", "top_prize_claimed", "1 × $500,000 top prize claimed (2 left).", at: 50), // already seen
+            event(3, "1999", "top_prize_claimed", "1 × $5 top prize claimed.", at: 120),               // not starred
+            event(4, "1972", "score_changed", "Score decreased from 90 → 80.", at: 130),                 // raw score move: skipped
+            event(5, "1972", "score_changed", "Profile changed from strong to average.", at: 130),
+            event(6, "1972", "structure_changed", "Prize tier revised.", at: 140),                       // not a notification kind
+            event(7, "2020", "game_announced", "New $10 game announced: Wild 50X (02020), launching Dec 30, 2026.", at: 150, name: "Wild 50X"),
+        ]
+        let notes = NotificationSelector.select(events: events, watched: ["1972"], after: 60, includeAnnouncements: false)
+        XCTAssertEqual(notes.map(\.id), ["event-1", "event-5"])
+        XCTAssertEqual(notes[0].title, "Game ($10)")
+        XCTAssertEqual(notes[0].gameId, "1972")
+
+        let withAnnouncements = NotificationSelector.select(events: events, watched: ["1972"], after: 60, includeAnnouncements: true)
+        XCTAssertEqual(withAnnouncements.last, PlannedNotification(id: "event-7", title: "New game announced", body: "New $10 game announced: Wild 50X (02020), launching Dec 30, 2026.", gameId: nil))
+        XCTAssertEqual(NotificationSelector.newestTime(events), 150)
+    }
+
+    func testManyEventsCollapseIntoASummary() {
+        let events = (1...9).map { event($0, "1972", "major_prize_claimed", "1 × $10,000 prize claimed.", at: Double($0)) }
+        let notes = NotificationSelector.select(events: events, watched: ["1972"], after: 0, includeAnnouncements: false, limit: 5)
+        XCTAssertEqual(notes.count, 5)
+        XCTAssertEqual(notes.prefix(4).map(\.id), ["event-6", "event-7", "event-8", "event-9"])
+        XCTAssertEqual(notes.last?.body, "5 more updates. Open NJ Scratch to see them in Changes.")
+        XCTAssertNil(notes.last?.gameId)
+    }
+
+    func testNothingWhenNothingIsStarredAndAnnouncementsAreOff() {
+        let events = [event(1, "1972", "top_prize_claimed", "x", at: 10)]
+        XCTAssertTrue(NotificationSelector.select(events: events, watched: [], after: 0, includeAnnouncements: false).isEmpty)
+    }
+}

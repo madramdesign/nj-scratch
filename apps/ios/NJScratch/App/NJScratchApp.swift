@@ -1,9 +1,33 @@
 import SwiftUI
+import UserNotifications
+
+/// Shows notifications while the app is open and opens the game when one is tapped.
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let info = response.notification.request.content.userInfo
+        await MainActor.run {
+            if let gameId = info["gameId"] as? String { Router.shared.open(gameId: gameId) } else { Router.shared.tab = .changes }
+        }
+    }
+}
 
 @main
 struct NJScratchApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     @State private var store = DataStore()
     @State private var watchlist = Watchlist()
+    @State private var notifier = Notifier.shared
+    @State private var router = Router.shared
     @AppStorage("acknowledgedNotice.v1") private var acknowledged = false
 
     var body: some Scene {
@@ -11,27 +35,46 @@ struct NJScratchApp: App {
             RootView()
                 .environment(store)
                 .environment(watchlist)
+                .environment(notifier)
+                .environment(router)
                 .fullScreenCover(isPresented: .constant(!acknowledged)) {
                     NoticeView { acknowledged = true }
                 }
                 .task { await store.refresh() }
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { notifier.scheduleRefresh() }
+        }
+        // iOS runs this when it grants background time (roughly every few hours, at its discretion).
+        .backgroundTask(.appRefresh(Notifier.refreshTaskId)) {
+            await MainActor.run { Notifier.shared.scheduleRefresh() }
+            let (store, watched) = await MainActor.run { (DataStore(), Set(Watchlist().ids)) }
+            await Notifier.shared.check(store: store, watched: watched)
+        }
     }
 }
 
 struct RootView: View {
+    @Environment(Router.self) private var router
+
     var body: some View {
-        TabView {
-            NavigationStack { RankingsView() }
+        @Bindable var router = router
+        TabView(selection: $router.tab) {
+            NavigationStack(path: $router.rankingsPath) { RankingsView() }
                 .tabItem { Label("Rankings", systemImage: "list.number") }
+                .tag(Router.Tab.rankings)
             NavigationStack { CalendarView() }
                 .tabItem { Label("Calendar", systemImage: "calendar") }
+                .tag(Router.Tab.calendar)
             NavigationStack { ChangesView() }
                 .tabItem { Label("Changes", systemImage: "bell") }
+                .tag(Router.Tab.changes)
             NavigationStack { WatchlistView() }
                 .tabItem { Label("Watchlist", systemImage: "star") }
+                .tag(Router.Tab.watchlist)
             NavigationStack { AboutView() }
                 .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(Router.Tab.about)
         }
     }
 }
