@@ -67,6 +67,8 @@ struct NoticeView: View {
                 .padding(.top, 8)
             }
             .padding(24)
+            .frame(maxWidth: 600)
+            .frame(maxWidth: .infinity)
         }
         .interactiveDismissDisabled()
     }

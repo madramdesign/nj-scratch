@@ -144,7 +144,9 @@ struct EventRow: View {
         case "top_prize_claimed": return ("trophy", .orange)
         case "top_prize_sold_out": return ("trophy.slash", .red)
         case "major_prize_claimed": return ("dollarsign.circle", .orange)
-        case "score_changed": return ("chart.line.uptrend.xyaxis", .blue)
+        case "score_changed":
+            let down = event.message.contains("decreased") || event.message.hasSuffix("to weak.") || event.message.contains("from strong")
+            return down ? ("chart.line.downtrend.xyaxis", .red) : ("chart.line.uptrend.xyaxis", .blue)
         case "game_added": return ("sparkles", .green)
         case "game_announced": return ("calendar.badge.plus", .green)
         case "structure_changed": return ("exclamationmark.triangle", .yellow)
@@ -250,6 +252,8 @@ struct AboutView: View {
             Section {
                 Link("Official NJ Lottery scratch-offs", destination: URL(string: "https://www.njlottery.com/en-us/scratch-offs.html#tab-active")!)
                 Link("Website version", destination: store.baseURL)
+                Link("Privacy policy", destination: store.baseURL.appendingPathComponent("privacy.html"))
+                Link("Support", destination: store.baseURL.appendingPathComponent("support.html"))
             } footer: {
                 Text("Not affiliated with or endorsed by the New Jersey Lottery. No account, no tracking: your watchlist stays on this device.")
             }
