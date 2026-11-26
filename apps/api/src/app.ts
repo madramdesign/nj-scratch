@@ -4,6 +4,7 @@ import type { AnalyzedGame } from '@nj/analytics';
 import { addToWatchlist, gameExists, removeFromWatchlist, type DB } from '@nj/database';
 import { runUpdate, type IngestResult } from '@nj/scraper';
 import { DashboardService, parseOptions } from './service.ts';
+import { atomFeed, FEED_LIMIT, jsonFeed, type FeedEvent } from './feeds.ts';
 
 export const DISCLAIMER =
   'Scratch-off tickets are gambling products and the lottery keeps a house edge. Rankings describe the official remaining-prize data; they are not predictions, ' +
@@ -25,6 +26,8 @@ export interface AppDeps {
   /** Min time between manual refreshes (the NJ API is CDN-cached for 5 minutes anyway). */
   refreshCooldownMs?: number;
   adminToken?: string;
+  /** Absolute public URL of the site, used for links in feeds (defaults to the request's origin). */
+  siteUrl?: string;
 }
 
 const priceParam = z.coerce.number().positive().max(1000);
@@ -172,12 +175,30 @@ export function createApp(deps: AppDeps) {
     });
   });
 
+  // Feeds of notable changes: everything, or one ticket price (/feeds/price-10.xml).
+  const siteUrl = (c: { req: { url: string } }) => deps.siteUrl ?? `${new URL(c.req.url).origin}/`;
+  const feedEvents = (priceCents?: number) =>
+    (service.events({ notableOnly: true, limit: 5000 }) as unknown as FeedEvent[]).filter((e) => priceCents == null || e.price_cents === priceCents).slice(0, FEED_LIMIT);
+  const atom = (body: string) => new Response(body, { headers: { 'Content-Type': 'application/atom+xml; charset=utf-8' } });
+  app.get('/feed.xml', (c) => atom(atomFeed(feedEvents(), { siteUrl: siteUrl(c), selfPath: 'feed.xml' })));
+  app.get('/feed.json', (c) => c.json(jsonFeed(feedEvents(), { siteUrl: siteUrl(c), selfPath: 'feed.json' }), 200, { 'Content-Type': 'application/feed+json; charset=utf-8' }));
+  app.get('/feeds/:file', (c) => {
+    const m = /^price-(\d+(?:\.\d+)?)\.xml$/.exec(c.req.param('file'));
+    const dollars = m ? priceParam.safeParse(m[1]) : null;
+    if (!m || !dollars?.success) return c.json({ error: 'Use /feeds/price-<dollars>.xml, e.g. /feeds/price-10.xml' }, 404);
+    const cents = Math.round(dollars.data * 100);
+    return atom(atomFeed(feedEvents(cents), { siteUrl: siteUrl(c), selfPath: `feeds/price-${m[1]}.xml`, title: `NJ Scratch-Off Tracker: notable changes, $${m[1]} games` }));
+  });
+
+  app.get('/api/calendar', (c) => c.json(service.calendar()));
+
   app.get('/api/updates', (c) => c.json({ status: service.status(), runs: service.runs(100) }));
 
   app.get('/api/changes', (c) => {
     const since = c.req.query('since') ? Number(c.req.query('since')) : undefined;
-    const limit = z.coerce.number().int().min(1).max(1000).catch(200).parse(c.req.query('limit'));
-    return c.json({ events: service.events({ since, limit }) });
+    const notableOnly = c.req.query('notable') === '1';
+    const limit = z.coerce.number().int().min(1).max(notableOnly ? 5000 : 1000).catch(200).parse(c.req.query('limit'));
+    return c.json({ events: service.events({ since, limit, notableOnly }) });
   });
 
   // Watchlist

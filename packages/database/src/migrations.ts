@@ -151,4 +151,15 @@ CREATE TABLE watchlist (
 );
 `,
   },
+  {
+    version: 2,
+    name: 'app metadata',
+    sql: `
+-- Small key/value store for bookkeeping such as which version of derived change events is stored.
+CREATE TABLE app_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+`,
+  },
 ];

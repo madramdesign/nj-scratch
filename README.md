@@ -14,10 +14,12 @@ It reads the **official NJ Lottery instant-games API** (the same JSON njlottery.
 
 - **Best Tickets:** summary cards, the top 3 with data-driven "why it ranks highly" text, and rankings by overall score, EV, jackpot availability, major-prize availability and value per dollar. Adjustable weights and major-prize threshold.
 - **All Games:** every active game with full metrics, filters (price, minimum top/major %, score, EV, prize value, top prize, maximum price, profile, search) and sorting (score, EV, EV %, price, top prize, top/major/all %, value, odds, prize ratio, recently changed).
-- **Jackpot Hunters, Best by Price ($1–$100), Best Odds** (any prize vs. *winning more than cost*), **Remaining %**, and **Tickets to Avoid** with reasons.
-- **Game detail:** recommendation with strengths and weaknesses, key numbers, break-even analysis, full prize table, distribution chart, score breakdown, history charts (top/major prizes, prize value, score, EV) and detected changes.
+- **Jackpot Hunters, Best by Price ($1–$100), Best Odds** (any prize vs. *winning more than cost*), **Remaining %**, and **Tickets to Avoid** with reasons, a list of games still on sale whose top prizes are all gone, and stronger same-price alternatives.
+- **Launches & Deadlines:** announced games with their launch date and exact return at launch, the games that stop selling next, and the last day to claim prizes on games no longer sold.
+- **Game detail:** recommendation with strengths and weaknesses, same-price games with a stronger profile, key numbers, break-even analysis, "if you buy several tickets" chances (any prize, $X or more, winning back more than you spend) next to the expected loss, full prize table, distribution chart, score breakdown, history charts (top/major prizes, prize value, score, EV) and detected changes.
 - **History and change detection:** snapshots on every data change; events such as "2 × $100,000 prizes claimed" or "Score decreased from 82 → 76". The history is backfilled from Internet Archive captures of the official API (2024-11 → 2026-02).
 - **Watchlist** (☆) with score deltas and alerts.
+- **Feeds:** notable changes as Atom (`feed.xml`), JSON Feed (`feed.json`) and one Atom feed per ticket price (`feeds/price-10.xml`).
 - **Data quality:** source, last successful and attempted update, data age, games retrieved, games with missing data, a full update log, and a stale-data banner.
 
 ## Setup
@@ -68,6 +70,8 @@ npm run typecheck
 
 `.github/workflows/update-and-deploy.yml` runs every 6 hours (and on every push to `main`). It restores the SQLite history from the `data` branch, fetches the official NJ data, runs the tests, saves the database back to `data`, exports the API as static JSON (`apps/api/src/export-static.ts`) and deploys to Pages. In the hosted build (`VITE_STATIC=1`), custom weights are re-scored in the browser, the watchlist is stored in the browser, and the manual refresh button is replaced by the automatic schedule. To run an update right away: **Actions → Update data & deploy site → Run workflow**.
 
+**Pipeline health:** after each update the workflow runs `npm run health` (`packages/scraper/src/health.ts`). If updates keep failing, the data hasn't been verified for 36 hours, NJ keeps returning out-of-date copies, or NJ revised a prize table, it opens (or updates) one issue labeled `pipeline-health`, and closes it once a check passes.
+
 **Backups:** every run adds a commit to the `data` branch, so each earlier copy of the database is kept. A copy that fails SQLite's integrity check or has fewer history rows than the previous backup is never saved (`packages/scraper/src/verify-db.ts`), and the run fails instead. To restore an earlier copy:
 
 ```bash
@@ -106,6 +110,7 @@ If NJ changes its response format, updates **fail loudly**: the run is recorded 
 | `STALE_AFTER_HOURS` | 36 | when the UI flags data as stale |
 | `DISABLE_SCHEDULER` | — | `1` to turn off in-process updates |
 | `ADMIN_TOKEN` | — | protects `POST /api/refresh` |
+| `SITE_URL` | request origin | absolute site URL used for links in feeds (set automatically in the Pages build) |
 
 ## API
 
@@ -118,7 +123,9 @@ If NJ changes its response format, updates **fail loudly**: the run is recorded 
 | `GET /api/rankings/best` · `/worst` · `/by-price` · `/by-price/:dollars` | ranking views |
 | `GET /api/statistics` | headline statistics |
 | `GET /api/updates` · `GET /api/status` | update log and data-quality status |
-| `GET /api/changes?since=&limit=` | change events |
+| `GET /api/changes?since=&limit=&notable=1` | change events (`notable=1`: skip small-prize payouts) |
+| `GET /api/calendar` | upcoming launches, end of sales, claim deadlines |
+| `GET /feed.xml` · `/feed.json` · `/feeds/price-<dollars>.xml` | notable-change feeds |
 | `GET/POST/DELETE /api/watchlist[/:id]` | watchlist |
 | `POST /api/refresh` | manual update |
 
@@ -144,5 +151,6 @@ docs/                   research, methodology, data dictionary, architecture
 - [docs/SCORING_METHODOLOGY.md](docs/SCORING_METHODOLOGY.md): every formula and weight, and why
 - [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md): tables and metric fields
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design and key decisions
+- [docs/FEATURE_RESEARCH.md](docs/FEATURE_RESEARCH.md), [FEATURE_BACKLOG.md](docs/FEATURE_BACKLOG.md), [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md): feature research, backlog and roadmap (living documents)
 
 Not affiliated with or endorsed by the New Jersey Lottery.

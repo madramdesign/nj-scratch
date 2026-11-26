@@ -15,6 +15,7 @@ import { Changes } from './pages/Changes';
 import { DataQuality } from './pages/DataQuality';
 import { Methodology } from './pages/Methodology';
 import { AllGames } from './pages/AllGames';
+import { CalendarPage } from './pages/Calendar';
 
 // The detail page carries the charting library; load it on demand.
 const GameDetailPage = lazy(() => import('./pages/GameDetail').then((m) => ({ default: m.GameDetailPage })));
@@ -27,6 +28,7 @@ const NAV = [
   ['/odds', 'Best Odds'],
   ['/remaining', 'Remaining %'],
   ['/avoid', 'Tickets to Avoid'],
+  ['/calendar', 'Launches & Deadlines'],
   ['/watchlist', '★ Watchlist'],
   ['/changes', 'Changes'],
   ['/data', 'Data Quality'],
@@ -79,6 +81,7 @@ export function Shell() {
           <Route path="/odds" element={<Odds />} />
           <Route path="/remaining" element={<RemainingPct />} />
           <Route path="/avoid" element={<Avoid />} />
+          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/changes" element={<Changes />} />
           <Route path="/data" element={<DataQuality />} />

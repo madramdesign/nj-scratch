@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { openDatabase, listRuns, listEvents, gameHistory, latestDataRun, loadRunGames, loadRawPayload, dbStats } from '@nj/database';
-import { fetchGamesPayload, FetchError, ingestPayload, rebuildChangeEvents, runUpdate, captureTime } from '../src/index.ts';
-import { DAY, fillerGames, payload, referenceGame, loadRealFixture, FIXTURE_NOW } from '../../../fixtures/testkit.ts';
+import { getMeta, openDatabase, listRuns, listEvents, gameHistory, latestDataRun, loadRunGames, loadRawPayload, dbStats } from '@nj/database';
+import { fetchGamesPayload, FetchError, ingestPayload, rebuildChangeEvents, runUpdate, captureTime, upgradeChangeEvents } from '../src/index.ts';
+import { DAY, fillerGames, payload, rawGame, referenceGame, loadRealFixture, FIXTURE_NOW } from '../../../fixtures/testkit.ts';
 
 const now = Date.parse('2026-06-01T00:00:00Z');
 const body = (games: any[]) => JSON.stringify(payload(games));
@@ -133,6 +133,34 @@ describe('ingestPayload → database', () => {
     expect(gameHistory(db, '4242').map((h) => h.top_remaining)).toEqual([8, 5]);
     expect(listEvents(db, { gameId: '4242' }).some((e) => e.kind === 'top_prize_claimed')).toBe(true);
     expect(latestDataRun(db)!.observed_at).toBe(now + 10 * DAY);
+  });
+
+  it('announces upcoming games and reports them as on sale once they launch', () => {
+    const db = openDatabase(':memory:');
+    ingestPayload(db, { body: body(baseGames()), observedAt: now, source: 'official', trigger: 'test' });
+    const coming = (paid: number) => rawGame({ id: 8888, name: 'Coming Soon', price: 1000, now, status: 'upcoming', tiers: [{ prize: 1000, original: 200_000, paid, type: 2 }, { prize: 2000, original: 150_000, paid }, { prize: 10_000_000, original: 4 }] });
+    ingestPayload(db, { body: body([...baseGames(), coming(0)]), observedAt: now + DAY, source: 'official', trigger: 'test' });
+    expect(listEvents(db, { gameId: '8888' }).map((e) => e.message)).toEqual([expect.stringMatching(/^New \$10 game announced: Coming Soon \(08888\), launching /)]);
+    ingestPayload(db, { body: body([...baseGames(), coming(500)]), observedAt: now + 12 * DAY, source: 'official', trigger: 'test' });
+    const kinds = listEvents(db, { gameId: '8888' }).map((e) => e.kind);
+    expect(kinds).toContain('game_added');
+    expect(kinds).not.toContain('status_changed');
+    rebuildChangeEvents(db);
+    expect(listEvents(db, { gameId: '8888' }).map((e) => e.kind).sort()).toEqual([...kinds].sort());
+  });
+
+  it('rebuilds events once when they were derived by older rules', () => {
+    const db = openDatabase(':memory:');
+    ingestPayload(db, { body: body(baseGames()), observedAt: now, source: 'official', trigger: 'test' });
+    const soldOut = baseGames();
+    soldOut.find((g) => g.gameId === '4242').prizeTiers[3].claimedTickets = 10;
+    ingestPayload(db, { body: body(soldOut), observedAt: now + DAY, source: 'official', trigger: 'test' });
+    db.prepare("DELETE FROM change_events WHERE kind = 'top_prize_sold_out'").run();
+    expect(getMeta(db, 'events_version')).toBeNull();
+    expect(upgradeChangeEvents(db)).toBeGreaterThan(0);
+    expect(getMeta(db, 'events_version')).toBe('2');
+    expect(listEvents(db, { gameId: '4242' }).some((e) => e.kind === 'top_prize_sold_out')).toBe(true);
+    expect(upgradeChangeEvents(db)).toBeNull();
   });
 
   it('ingests the saved real response (regression)', () => {

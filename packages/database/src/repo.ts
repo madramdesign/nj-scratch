@@ -214,13 +214,14 @@ export function insertEvents(db: DB, events: EventInput[]) {
   for (const e of events) ins.run(e.runId, e.gameId, e.observedAt, e.kind, e.severity, e.message, e.tierNumber ?? null, e.delta ?? null);
 }
 
-export function listEvents(db: DB, p: { gameId?: string; gameIds?: string[]; since?: number; limit?: number; runId?: number } = {}) {
+export function listEvents(db: DB, p: { gameId?: string; gameIds?: string[]; since?: number; limit?: number; runId?: number; notableOnly?: boolean } = {}) {
   const where: string[] = [];
   const args: Array<string | number> = [];
   if (p.gameId) { where.push('e.game_id = ?'); args.push(p.gameId); }
   if (p.gameIds) { where.push(`e.game_id IN (${p.gameIds.map(() => '?').join(',') || "''"})`); args.push(...p.gameIds); }
   if (p.since) { where.push('e.observed_at >= ?'); args.push(p.since); }
   if (p.runId) { where.push('e.run_id = ?'); args.push(p.runId); }
+  if (p.notableOnly) where.push("e.severity != 'info'");
   const sql = `SELECT e.*, g.name AS game_name, g.game_number, g.price_cents FROM change_events e LEFT JOIN games g ON g.game_id = e.game_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY e.observed_at DESC, e.id DESC LIMIT ?`;
   return db.prepare(sql).all(...args, p.limit ?? 200) as Row[];
@@ -300,4 +301,12 @@ export function quarantineRun(db: DB, runId: number, reason: string) {
   db.prepare(`DELETE FROM prize_snapshots WHERE snapshot_id IN (${snaps})`).run(runId);
   db.prepare('DELETE FROM game_snapshots WHERE run_id = ?').run(runId);
   db.prepare("UPDATE update_runs SET status = 'stale', error = ? WHERE id = ?").run(reason, runId);
+}
+
+export function getMeta(db: DB, key: string): string | null {
+  return (db.prepare('SELECT value FROM app_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null;
+}
+
+export function setMeta(db: DB, key: string, value: string) {
+  db.prepare('INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
 }

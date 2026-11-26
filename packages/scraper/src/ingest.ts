@@ -1,8 +1,8 @@
 import { parseGamesResponse, type NormalizedGame, type ParseReport } from '@nj/lottery-data';
-import { analyzeGames, diffGame, scoreChangeEvent, labelFor, type ChangeEvent } from '@nj/analytics';
+import { analyzeGames, diffGame, firstSeenEvent, scoreChangeEvent, labelFor, EVENTS_VERSION, type ChangeEvent } from '@nj/analytics';
 import {
   allGameIds, deleteEventsForGames, finishRun, hasPayload, insertEvents, insertScoring, insertSnapshot, lastRunWithStatus, loadSnapshot,
-  SOURCES, latestDataRun, previousScore, previousSnapshot, quarantineRun, runPaidTotals, saveRawPayload, scoreAtSnapshot, snapshotTimeline, startRun, transaction, upsertGame,
+  SOURCES, getMeta, setMeta, latestDataRun, previousScore, previousSnapshot, quarantineRun, runPaidTotals, saveRawPayload, scoreAtSnapshot, snapshotTimeline, startRun, transaction, upsertGame,
   type DB, type EventInput, type SourceKey,
 } from '@nj/database';
 
@@ -27,7 +27,8 @@ export interface IngestResult {
   error?: string;
 }
 
-const SNAPSHOT_STATUSES = new Set(['active', 'ended']);
+/** Upcoming games are stored too (they publish full prize tables before launch), so they can be listed and announced. */
+const SNAPSHOT_STATUSES = new Set(['active', 'ended', 'upcoming']);
 
 /**
  * Validate → normalize → snapshot → score → detect changes, all in one transaction.
@@ -180,7 +181,8 @@ function eventsFor(db: DB, g: NormalizedGame, observedAt: number, runId: number,
   const prev = previousSnapshot(db, g.gameId, observedAt);
   const out: ChangeEvent[] = [];
   if (!prev) {
-    if (g.status === 'active') out.push({ gameId: g.gameId, kind: 'game_added', severity: 'notable', message: `New game added: ${g.name} (${g.gameNumber}).` });
+    const first = firstSeenEvent(g);
+    if (first) out.push(first);
   } else {
     out.push(...diffGame(prev.game, g));
     const ps = previousScore(db, g.gameId, observedAt);
@@ -211,7 +213,8 @@ export function rebuildChangeEvents(db: DB): number {
         const sc = scoreAtSnapshot(db, s.snapshotId);
         const base = { runId: s.runId, observedAt: s.observedAt };
         if (!prev) {
-          if (s.observedAt !== firstObserved && g.status === 'active') evts.push({ ...base, gameId: id, kind: 'game_added', severity: 'notable', message: `New game added: ${g.name} (${g.gameNumber}).` });
+          const first = s.observedAt !== firstObserved ? firstSeenEvent(g) : null;
+          if (first) evts.push({ ...first, ...base });
         } else {
           for (const e of diffGame(prev, g)) evts.push({ ...e, ...base });
           const ch = scoreChangeEvent(id, prevScore?.score ?? null, sc?.score ?? null);
@@ -226,8 +229,16 @@ export function rebuildChangeEvents(db: DB): number {
       insertEvents(db, evts);
       total += evts.length;
     }
+    setMeta(db, 'events_version', String(EVENTS_VERSION));
   });
   return total;
 }
 
 export { lastRunWithStatus };
+
+/** Rebuild stored change events once if they were derived by an older version of the event rules. */
+export function upgradeChangeEvents(db: DB): number | null {
+  const stored = Number(getMeta(db, 'events_version') ?? 1);
+  if (stored >= EVENTS_VERSION) return null;
+  return rebuildChangeEvents(db);
+}

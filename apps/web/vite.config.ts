@@ -6,6 +6,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    proxy: { '/api': { target: `http://localhost:${process.env.API_PORT ?? 8787}`, changeOrigin: true } },
+    proxy: Object.fromEntries(['/api', '/feed.xml', '/feed.json', '/feeds'].map((path) => [path, { target: `http://localhost:${process.env.API_PORT ?? 8787}`, changeOrigin: true }])),
   },
 });

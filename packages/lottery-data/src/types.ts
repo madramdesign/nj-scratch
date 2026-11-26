@@ -1,4 +1,7 @@
 export type GameStatus = 'active' | 'ended' | 'expired' | 'upcoming' | 'unknown';
+
+/** njlottery.com stops selling a game 365 days before its `disableDate`; prizes can be claimed until `disableDate`. */
+export const CLAIM_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 export type PrizeKind = 'cash' | 'free_ticket' | 'annuity';
 
 export interface DataIssue {

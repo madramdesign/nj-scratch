@@ -264,3 +264,10 @@ th small { font-weight: 500; text-transform: none; opacity: 0.8; }
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
   .card-value { font-size: 1.2rem; }
 }
+
+/* Same-price alternatives */
+.alt-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.alt-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.alt-list .game-link { display: inline-flex; flex-direction: row; gap: 6px; align-items: baseline; }
+.alt-inline { margin: 8px 0 0; }
+.alt-inline .game-link { display: inline-flex; flex-direction: row; gap: 4px; align-items: baseline; }

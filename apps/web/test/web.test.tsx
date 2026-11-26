@@ -143,3 +143,29 @@ describe('Game detail page', () => {
     expect(screen.getByText(/not a prediction/)).toBeInTheDocument();
   });
 });
+
+describe('Phase 1 views', () => {
+  it('game detail shows the several-tickets calculator with expected loss', async () => {
+    renderAt('/game/1908');
+    expect(await screen.findByRole('heading', { name: /If you buy several tickets/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '5 tickets' }));
+    expect(screen.getByRole('button', { name: '5 tickets' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('$150.00')).toBeInTheDocument();
+    expect(screen.getByText('Win back more than you spend')).toBeInTheDocument();
+  });
+
+  it('Avoid lists games whose top prizes are all gone', async () => {
+    renderAt('/avoid');
+    expect(await screen.findByRole('heading', { name: 'Top prizes gone, still on sale' })).toBeInTheDocument();
+    const gone = summaries.filter((g) => g.topPrize.original > 0 && g.topPrize.remaining === 0);
+    if (gone.length) expect(screen.getAllByText(gone[0].name).length).toBeGreaterThan(0);
+    else expect(screen.getByText(/Every active game still has at least one top prize left/)).toBeInTheDocument();
+  });
+
+  it('Changes offers feed links for all games and each price', async () => {
+    vi.stubGlobal('fetch', vi.fn(mockFetch({ '/api/changes': { events: [] }, '/api/games': { status, games: summaries }, '/api/meta': meta, '/api/watchlist': { items: [], alerts: [] } })));
+    renderAt('/changes');
+    expect(await screen.findByRole('link', { name: 'All games (Atom)' })).toHaveAttribute('href', '/feed.xml');
+    expect(await screen.findByRole('link', { name: '$30' })).toHaveAttribute('href', '/feeds/price-30.xml');
+  });
+});

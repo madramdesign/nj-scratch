@@ -33,7 +33,7 @@ game_id, game_number (zero-padded), name, price_cents, launch_date, disable_date
 game_id, tier_number, prize_cents (cash value), advertised_cents (headline, null if not parseable), description, tier_type (1 cash, 2 free ticket, 16 annuity), original_count.
 
 ### `game_snapshots` — immutable per-game observation
-run_id, game_id, observed_at, name, status (`active`/`ended` at observation time), validation_status, price_cents, launch/start/end distribution/disable dates, total_tickets_printed, top_prize_cents, top_prize_label, data_hash (sha256 of the canonical raw game). Unique (run_id, game_id).
+run_id, game_id, observed_at, name, status (`active`/`ended`/`upcoming` at observation time; upcoming games publish full prize tables before launch), validation_status, price_cents, launch/start/end distribution/disable dates, total_tickets_printed, top_prize_cents, top_prize_label, data_hash (sha256 of the canonical raw game). Unique (run_id, game_id).
 
 ### `prize_snapshots` — immutable per-tier observation
 snapshot_id, tier_number, prize_cents, description, tier_type, original_count, paid_count, claimed_count, remaining_count (official formula).
@@ -42,7 +42,10 @@ snapshot_id, tier_number, prize_cents, description, tier_type, original_count, p
 snapshot_id, run_id, game_id, observed_at, methodology_version, score, rank, label, current_ev_cents *(estimate)*, current_return *(estimate)*, original_return, top_remaining, top_original, major_remaining, major_original ($10k+), prizes_remaining, value_remaining_cents, tickets_remaining_est *(estimate)*, components_json.
 
 ### `change_events`
-run_id, game_id, observed_at, kind (`top_prize_claimed`, `major_prize_claimed`, `prizes_claimed`, `score_changed`, `game_added`, `status_changed`, `structure_changed`), severity (`info`/`notable`/`warning`), message, tier_number, delta.
+run_id, game_id, observed_at, kind (`top_prize_claimed`, `top_prize_sold_out`, `major_prize_claimed`, `prizes_claimed`, `score_changed`, `game_added`, `game_announced`, `status_changed`, `structure_changed`), severity (`info`/`notable`/`warning`), message, tier_number, delta.
+
+### `app_meta`
+Key/value bookkeeping. `events_version` records which version of the change-event rules (`EVENTS_VERSION` in `packages/analytics/src/changes.ts`) built `change_events`; `npm run scrape` rebuilds all events once when it is older.
 
 ### `watchlist`
 game_id, added_at, score_at_add, note.

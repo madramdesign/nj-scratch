@@ -94,12 +94,13 @@ export async function staticGet(path: string): Promise<any> {
     return a ? { ...base, game: { ...a.metrics, score: a.score, explanation: a.explanation } } : base;
   }
   if (p === 'meta') return file('meta.json');
+  if (p === 'calendar') return file('calendar.json');
   if (p === 'status') return freshen(await file<Record<string, any>>('status.json'));
   if (p === 'updates') {
     const u = await file<{ status: Record<string, any> }>('updates.json');
     return { ...u, status: freshen(u.status) };
   }
-  if (p === 'changes') return file('changes.json');
+  if (p === 'changes') return file(params.get('notable') === '1' ? 'changes-notable.json' : 'changes.json');
   if (p === 'watchlist') {
     const ids = watchIds();
     const { games } = await staticGet(`/api/games${url.search}`);
