@@ -24,7 +24,7 @@ export function startScheduler(p: { db: DB; intervalMs: number; update: () => Pr
       schedule(retryMs);
     }
   };
-  const last = lastRunWithStatus(p.db, ['success', 'unchanged', 'failed']);
+  const last = lastRunWithStatus(p.db, ['success', 'unchanged', 'stale', 'failed']);
   const due = !last || Date.now() - last.started_at > p.intervalMs || last.status === 'failed';
   schedule(due ? 2_000 : p.intervalMs - (Date.now() - last!.started_at));
   console.log(`[scheduler] next update ${due ? 'in a few seconds' : `in ${Math.round((p.intervalMs - (Date.now() - last!.started_at)) / 60_000)} min`}`);

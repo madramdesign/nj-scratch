@@ -10,7 +10,7 @@ export interface RunRow {
   started_at: number;
   finished_at: number | null;
   observed_at: number;
-  status: 'running' | 'success' | 'unchanged' | 'failed';
+  status: 'running' | 'success' | 'unchanged' | 'stale' | 'failed';
   http_status: number | null;
   payload_hash: string | null;
   games_total: number | null;
@@ -279,4 +279,25 @@ export function dbStats(db: DB) {
   const c = (t: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n;
   const span = db.prepare("SELECT MIN(observed_at) AS first, MAX(observed_at) AS last, COUNT(DISTINCT observed_at) AS points FROM game_snapshots").get() as Row;
   return { games: c('games'), snapshots: c('game_snapshots'), prizeSnapshots: c('prize_snapshots'), runs: c('update_runs'), events: c('change_events'), historyFirst: span.first, historyLast: span.last, historyPoints: span.points };
+}
+
+/** Total paid tickets per game in a run. Used to spot out-of-date responses (paid counts only grow). */
+export function runPaidTotals(db: DB, runId: number): Map<string, number> {
+  const rows = db
+    .prepare('SELECT g.game_id AS id, SUM(p.paid_count) AS paid FROM game_snapshots g JOIN prize_snapshots p ON p.snapshot_id = g.id WHERE g.run_id = ? GROUP BY g.game_id')
+    .all(runId) as { id: string; paid: number }[];
+  return new Map(rows.map((r) => [r.id, Number(r.paid)]));
+}
+
+/**
+ * Withdraw a run whose data turned out to be an out-of-date copy: its snapshots, scores and change
+ * events are removed and the run is marked `stale`. The run row and its raw payload are kept as a record.
+ */
+export function quarantineRun(db: DB, runId: number, reason: string) {
+  const snaps = 'SELECT id FROM game_snapshots WHERE run_id = ?';
+  db.prepare('DELETE FROM change_events WHERE run_id = ?').run(runId);
+  db.prepare(`DELETE FROM scoring_snapshots WHERE snapshot_id IN (${snaps})`).run(runId);
+  db.prepare(`DELETE FROM prize_snapshots WHERE snapshot_id IN (${snaps})`).run(runId);
+  db.prepare('DELETE FROM game_snapshots WHERE run_id = ?').run(runId);
+  db.prepare("UPDATE update_runs SET status = 'stale', error = ? WHERE id = ?").run(reason, runId);
 }

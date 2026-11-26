@@ -1,6 +1,7 @@
 /**
  * Safety check before a database is saved as a backup: the file must pass SQLite's integrity
- * check, and no append-only history table may have fewer rows than the previously saved copy.
+ * check, and no history table may have fewer rows than the previously saved copy — except that
+ * snapshot rows may disappear when a run holding out-of-date data was withdrawn (marked stale).
  * Usage: `tsx verify-db.ts <new.db> [previous.db]` — exits non-zero when the new copy looks damaged.
  */
 import { existsSync } from 'node:fs';
@@ -9,11 +10,14 @@ import { pathToFileURL } from 'node:url';
 
 export const APPEND_ONLY_TABLES = ['update_runs', 'raw_payloads', 'game_snapshots', 'prize_snapshots', 'scoring_snapshots'] as const;
 
+const NEVER_SHRINK = new Set<string>(['update_runs', 'raw_payloads']);
+
 function rowCounts(path: string): Record<string, number> {
   const db = new DatabaseSync(path, { readOnly: true });
   try {
     const counts: Record<string, number> = {};
     for (const t of APPEND_ONLY_TABLES) counts[t] = Number((db.prepare(`SELECT count(*) AS n FROM ${t}`).get() as { n: number }).n);
+    counts.stale_runs = Number((db.prepare(`SELECT count(*) AS n FROM update_runs WHERE status = 'stale'`).get() as { n: number }).n);
     return counts;
   } finally {
     db.close();
@@ -46,7 +50,16 @@ export function verifyDatabase(nextPath: string, previousPath?: string | null): 
     } catch {
       // The previous copy is unreadable; nothing to compare against.
     }
-    if (prev) for (const t of APPEND_ONLY_TABLES) if (next[t] < prev[t]) problems.push(`${t} shrank from ${prev[t]} to ${next[t]} rows`);
+    if (prev) {
+      // Snapshot rows may only disappear when a run holding an out-of-date copy was withdrawn
+      // (marked `stale`); the run log and raw responses must never shrink.
+      const withdrew = next.stale_runs > prev.stale_runs;
+      for (const t of APPEND_ONLY_TABLES) {
+        if (next[t] >= prev[t]) continue;
+        if (withdrew && !NEVER_SHRINK.has(t)) continue;
+        problems.push(`${t} shrank from ${prev[t]} to ${next[t]} rows`);
+      }
+    }
   }
   return problems;
 }

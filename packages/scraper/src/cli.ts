@@ -2,8 +2,11 @@
 /** One-shot update: `npm run scrape`. Exits non-zero when the update fails so cron/launchd can alert. */
 import { openDatabase } from '@nj/database';
 import { runUpdate } from './update.ts';
+import { quarantineStaleRuns } from './ingest.ts';
 
 const db = openDatabase();
+const withdrawn = quarantineStaleRuns(db);
+if (withdrawn.length) console.log(`[scrape] Withdrew ${withdrawn.length} earlier run(s) that held out-of-date data: ${withdrawn.join(', ')}`);
 const result = await runUpdate(db, { trigger: 'cli', log: (m) => console.log(`[scrape] ${m}`) });
 if (result.report) {
   const r = result.report;

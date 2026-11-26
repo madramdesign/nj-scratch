@@ -53,7 +53,7 @@ export function DataQuality() {
                   <td>{dateTime(r.started_at)}</td>
                   <td>{r.source_key === 'internet-archive' ? 'Internet Archive' : 'njlottery.com'}</td>
                   <td>{r.trigger}</td>
-                  <td><span className={`run-status run-${r.status}`}>{r.status === 'failed' ? '✕' : r.status === 'unchanged' ? '=' : '✓'} {r.status}</span></td>
+                  <td><span className={`run-status run-${r.status}`}>{r.status === 'failed' ? '✕' : r.status === 'unchanged' ? '=' : r.status === 'stale' ? '↺' : '✓'} {r.status}</span></td>
                   <td className="num">{r.games_total ?? '—'}</td>
                   <td className="num">{r.games_active ?? '—'}</td>
                   <td>{dateTime(r.observed_at)}</td>
@@ -64,7 +64,8 @@ export function DataQuality() {
           </table>
         </div>
         <p className="muted small">
-          “unchanged” means njlottery.com was checked and returned identical data, so no new snapshot was stored. If NJ’s response format changes, updates fail loudly and the
+          “unchanged” means njlottery.com was checked and returned identical data, so no new snapshot was stored. “stale” means njlottery.com returned an older copy of the data than
+          the one already stored (fewer paid prizes), so it was ignored. If NJ’s response format changes, updates fail loudly and the
           dashboard keeps showing the last good data with its age.
         </p>
       </section>

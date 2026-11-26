@@ -201,3 +201,55 @@ describe('verifyDatabase (backup safety check)', async () => {
     expect(verifyDatabase(bad).length).toBeGreaterThan(0);
   });
 });
+
+describe('out-of-date responses', async () => {
+  const { quarantineStaleRuns, paidShortfall } = await import('../src/index.ts');
+  const withPaid = (extra: number) => {
+    const games = baseGames();
+    games[0].prizeTiers[0].paidTickets += extra;
+    return games;
+  };
+
+  it('ignores a response with fewer paid prizes than the stored data', () => {
+    const db = openDatabase(':memory:');
+    ingestPayload(db, { body: body(withPaid(0)), observedAt: now, source: 'official', trigger: 'test' });
+    const newer = ingestPayload(db, { body: body(withPaid(10)), observedAt: now + 60_000, source: 'official', trigger: 'test' });
+    expect(newer.status).toBe('success');
+    const older = ingestPayload(db, { body: body(withPaid(4)), observedAt: now + 120_000, source: 'official', trigger: 'test' });
+    expect(older.status).toBe('stale');
+    expect(older.error).toMatch(/out-of-date copy of the data \(6 fewer paid prizes/);
+    expect(latestDataRun(db)!.id).toBe(newer.runId);
+    expect(listEvents(db, { runId: older.runId })).toHaveLength(0);
+    // The same out-of-date response again is recognized and not re-processed.
+    expect(ingestPayload(db, { body: body(withPaid(4)), observedAt: now + 180_000, source: 'official', trigger: 'test' }).status).toBe('unchanged');
+    // Real progress afterwards is accepted.
+    expect(ingestPayload(db, { body: body(withPaid(20)), observedAt: now + 240_000, source: 'official', trigger: 'test' }).status).toBe('success');
+  });
+
+  it('paidShortfall only compares games present in both', () => {
+    const prev = new Map([['1', 100], ['gone', 999]]);
+    const g = (id: string, paid: number) => ({ gameId: id, tiers: [{ paid }] }) as any;
+    expect(paidShortfall(prev, [g('1', 90), g('new', 5)])).toBe(10);
+    expect(paidShortfall(prev, [g('1', 120)])).toBe(-20);
+  });
+
+  it('withdraws earlier runs that went backwards and rebuilds events', () => {
+    const db = openDatabase(':memory:');
+    // Build a history stored before the check existed: a (0) → b (10) → c (4, an out-of-date copy).
+    // Ingesting b last with an earlier observation time skips the live check, like the old code.
+    const a = ingestPayload(db, { body: body(withPaid(0)), observedAt: now, source: 'official', trigger: 'test' });
+    const c = ingestPayload(db, { body: body(withPaid(4)), observedAt: now + 120_000, source: 'official', trigger: 'test' });
+    const b = ingestPayload(db, { body: body(withPaid(10)), observedAt: now + 60_000, source: 'official', trigger: 'test' });
+    expect([a.status, b.status, c.status]).toEqual(['success', 'success', 'success']);
+
+    expect(quarantineStaleRuns(db)).toEqual([c.runId]);
+    expect(latestDataRun(db)!.id).toBe(b.runId);
+    const run = listRuns(db, 10).find((r) => r.id === c.runId)!;
+    expect(run.status).toBe('stale');
+    expect(run.error).toMatch(/6 fewer paid prizes/);
+    expect(listEvents(db, { runId: c.runId })).toHaveLength(0);
+    expect(loadRawPayload(db, c.report!.payloadHash)).not.toBeNull(); // the raw response is kept as a record
+    expect(listEvents(db, { runId: b.runId }).length).toBeGreaterThan(0);
+    expect(quarantineStaleRuns(db)).toEqual([]); // idempotent
+  });
+});

@@ -2,7 +2,7 @@ import { parseGamesResponse, type NormalizedGame, type ParseReport } from '@nj/l
 import { analyzeGames, diffGame, scoreChangeEvent, labelFor, type ChangeEvent } from '@nj/analytics';
 import {
   allGameIds, deleteEventsForGames, finishRun, hasPayload, insertEvents, insertScoring, insertSnapshot, lastRunWithStatus, loadSnapshot,
-  latestDataRun, previousScore, previousSnapshot, saveRawPayload, scoreAtSnapshot, snapshotTimeline, startRun, transaction, upsertGame,
+  SOURCES, latestDataRun, previousScore, previousSnapshot, quarantineRun, runPaidTotals, saveRawPayload, scoreAtSnapshot, snapshotTimeline, startRun, transaction, upsertGame,
   type DB, type EventInput, type SourceKey,
 } from '@nj/database';
 
@@ -20,7 +20,7 @@ export interface IngestInput {
 
 export interface IngestResult {
   runId: number;
-  status: 'success' | 'unchanged' | 'failed';
+  status: 'success' | 'unchanged' | 'stale' | 'failed';
   report?: ParseReport;
   snapshots?: number;
   events?: number;
@@ -62,7 +62,18 @@ export function ingestPayload(db: DB, input: IngestInput): IngestResult {
       return { runId, status: 'unchanged', report };
     }
 
-    const isFirstData = !latestDataRun(db);
+    const latest = latestDataRun(db);
+    const isFirstData = !latest;
+    if (input.source === 'official' && latest && latest.source_key === SOURCES.official.key && latest.observed_at < input.observedAt) {
+      const toCheck = parsed.games.filter((g) => SNAPSHOT_STATUSES.has(g.status) && g.tiers.length > 0);
+      const behind = paidShortfall(runPaidTotals(db, latest.id), toCheck);
+      if (behind > 0) {
+        const error = staleMessage(behind);
+        saveRawPayload(db, runId, report.payloadHash, input.body, input.observedAt);
+        finishRun(db, runId, { status: 'stale', ...reportFields, error, duration_ms: Date.now() - startedAt });
+        return { runId, status: 'stale', report, error };
+      }
+    }
     const result = transaction(db, () => {
       saveRawPayload(db, runId, report!.payloadHash, input.body, input.observedAt);
       const snapIds = new Map<string, number>();
@@ -106,6 +117,63 @@ export function ingestPayload(db: DB, input: IngestInput): IngestResult {
     finishRun(db, runId, { status: 'failed', error, payload_hash: report?.payloadHash ?? null, http_status: input.httpStatus ?? null, duration_ms: Date.now() - startedAt });
     return { runId, status: 'failed', error, report };
   }
+}
+
+/**
+ * How many paid tickets a response is behind the previous data, summed over the games present in both.
+ * Paid counts only grow, so a positive result means the response is an out-of-date copy (NJ's servers or
+ * caches can briefly disagree), not news.
+ */
+export function paidShortfall(previous: Map<string, number>, games: NormalizedGame[]): number {
+  let prev = 0;
+  let next = 0;
+  for (const g of games) {
+    const p = previous.get(g.gameId);
+    if (p == null) continue;
+    prev += p;
+    next += g.tiers.reduce((n, t) => n + t.paid, 0);
+  }
+  return prev - next;
+}
+
+const staleMessage = (behind: number) =>
+  `njlottery.com returned an out-of-date copy of the data (${behind.toLocaleString('en-US')} fewer paid prizes than the data already stored); it was not used.`;
+
+/**
+ * Find official runs whose data went backwards compared with the run before them, withdraw them, and
+ * rebuild change events. Safe to run repeatedly; returns the withdrawn run ids.
+ */
+export function quarantineStaleRuns(db: DB): number[] {
+  const runs = db
+    .prepare(
+      `SELECT r.id FROM update_runs r JOIN data_sources s ON s.id = r.source_id
+       WHERE s.key = ? AND r.status = 'success' AND EXISTS (SELECT 1 FROM game_snapshots g WHERE g.run_id = r.id)
+       ORDER BY r.observed_at, r.id`,
+    )
+    .all(SOURCES.official.key) as { id: number }[];
+  const withdrawn: number[] = [];
+  let accepted: Map<string, number> | null = null;
+  for (const { id } of runs) {
+    const totals = runPaidTotals(db, id);
+    if (accepted) {
+      let prev = 0;
+      let next = 0;
+      for (const [game, paid] of totals) {
+        const p = accepted.get(game);
+        if (p == null) continue;
+        prev += p;
+        next += paid;
+      }
+      if (next < prev) {
+        withdrawn.push(id);
+        transaction(db, () => quarantineRun(db, id, staleMessage(prev - next)));
+        continue;
+      }
+    }
+    accepted = totals;
+  }
+  if (withdrawn.length) rebuildChangeEvents(db);
+  return withdrawn;
 }
 
 function eventsFor(db: DB, g: NormalizedGame, observedAt: number, runId: number, score: number | null): EventInput[] {

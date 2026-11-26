@@ -18,6 +18,7 @@ export async function runUpdate(db: DB, opts: { trigger: string; fetch?: FetchOp
   }
   const result = ingestPayload(db, { body: fetched.body, observedAt: fetched.fetchedAt, source: 'official', trigger: opts.trigger, httpStatus: fetched.status });
   if (result.status === 'failed') log(`Validation failed: ${result.error}`);
+  else if (result.status === 'stale') log(`Update skipped: ${result.error}`);
   else log(`Update ${result.status}: ${result.report?.activeGames} active games, ${result.snapshots ?? 0} snapshots, ${result.events ?? 0} change events.`);
   return result;
 }

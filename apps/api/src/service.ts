@@ -64,7 +64,7 @@ export class DashboardService {
   status() {
     const now = this.now();
     const data = latestDataRun(this.db);
-    const lastOk = this.db.prepare(`SELECT r.started_at, r.status FROM update_runs r JOIN data_sources s ON s.id = r.source_id WHERE s.key = ? AND r.status IN ('success','unchanged') ORDER BY r.started_at DESC LIMIT 1`).get(SOURCES.official.key) as { started_at: number; status: string } | undefined;
+    const lastOk = this.db.prepare(`SELECT r.started_at, r.status FROM update_runs r JOIN data_sources s ON s.id = r.source_id WHERE s.key = ? AND r.status IN ('success','unchanged','stale') ORDER BY r.started_at DESC LIMIT 1`).get(SOURCES.official.key) as { started_at: number; status: string } | undefined;
     const lastOfficialOk = lastOk?.started_at;
     const lastAttempt = listRuns(this.db, 1)[0];
     const lastFailed = lastRunWithStatus(this.db, ['failed']);

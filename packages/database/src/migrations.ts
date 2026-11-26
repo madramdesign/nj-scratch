@@ -22,7 +22,7 @@ CREATE TABLE update_runs (
   started_at INTEGER NOT NULL,           -- epoch ms
   finished_at INTEGER,
   observed_at INTEGER NOT NULL,          -- when the data is "as of" (fetch time, or archive capture time)
-  status TEXT NOT NULL,                  -- running | success | unchanged | failed
+  status TEXT NOT NULL,                  -- running | success | unchanged | stale | failed
   http_status INTEGER,
   payload_hash TEXT,
   games_total INTEGER,
