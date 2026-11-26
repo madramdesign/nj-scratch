@@ -12,6 +12,10 @@
   "whatsNew": null,
   "reviewNotes": "NJ Scratch is an information app. It analyzes the New Jersey Lottery's publicly available remaining-prize data for active scratch-off (instant) games, published at https://www.njlottery.com/api/v1/instant-games/games/ and mirrored as static JSON on our website (https://madramdesign.github.io/nj-scratch/).\n\nThe app does NOT sell lottery tickets, accept wagers or payments, link to ticket purchases, run contests, or offer prizes. It has no accounts, ads or in-app purchases, and collects no data. It is not affiliated with the New Jersey Lottery.\n\nResponsible-gambling measures: a first-launch notice (gambling and house edge, rankings are not predictions, 18+ to buy tickets, 1-800-GAMBLER) that must be acknowledged; the same information on the About screen; expected loss shown next to every probability; no 'win' or 'hot game' language.\n\nNo login is needed. All features are available immediately after tapping 'I'm 18 or older, continue'.",
   "ageRatingOverride": "EIGHTEEN_PLUS",
-  "availability": ["USA"],
-  "price": "free"
+  "availability": [
+    "USA"
+  ],
+  "price": "free",
+  "contentRightsDeclaration": "USES_THIRD_PARTY_CONTENT",
+  "copyright": "2026 Madram Design"
 }

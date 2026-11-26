@@ -9,3 +9,4 @@ apps/ios/build
 apps/ios/NJScratch.xcodeproj
 apps/ios/NJScratch/Resources/Info.plist
 xcuserdata
+apps/ios/AppStore/review-contact.json
