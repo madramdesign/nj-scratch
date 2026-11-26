@@ -12,7 +12,19 @@ It reads the same JSON the website publishes on GitHub Pages (`<site>/api/*.json
 | **Game detail** | Assessment and its reasons, stronger same-price alternatives, key numbers, break-even, "If you buy several tickets" chances next to the expected loss, history charts, prize table and score breakdown. Links to njlottery.com. |
 | **Calendar** | Announced games, the games that stop selling next, and the last day to claim prizes. |
 | **Changes** | Notable changes in the official data, grouped by day. |
-| **Watchlist** | Starred games (stored on the device only) and their recent notable changes. |
+| **Watchlist** | Starred games (stored on the device only), their recent notable changes, and notification settings. |
+
+**Notifications (version 1.1).** Turn them on in Watchlist → Notifications. There are two options:
+- **Starred games:** top or major prizes claimed, the last top prize claimed, and profile changes.
+- **New game announcements.**
+
+How it works:
+- iOS runs a background app refresh (`com.madramdesign.NJScratch.refresh`) when it chooses, typically a few times a day. The app fetches `api/changes-notable.json` and posts local notifications for events newer than the last check.
+- The first check after you turn notifications on only records the current position, so older changes are never sent.
+- Each check posts at most 5 notifications; anything beyond the first 4 becomes one summary.
+- Tapping a game notification opens that game; tapping the summary opens Changes.
+- There is no server or push service, and nothing leaves the device.
+- Debug builds have a "check the last 3 days now" button for testing.
 | **About** | Data freshness, a scoring summary, responsible-play information and links. |
 
 The first time the app opens, it shows a notice covering:

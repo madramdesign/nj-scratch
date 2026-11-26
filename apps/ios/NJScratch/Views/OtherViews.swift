@@ -205,6 +205,7 @@ struct WatchlistView: View {
                     }
                 }
             }
+            NotificationSettingsSection()
         }
         .navigationTitle("Watchlist")
         .navigationDestination(for: String.self) { GameDetailView(gameId: $0) }
@@ -278,5 +279,53 @@ struct ExternalRow<Content: View>: View {
             }
         }
         .tint(.primary)
+    }
+}
+
+/// Opt-in notifications for starred games and new game announcements (local notifications from background refresh).
+struct NotificationSettingsSection: View {
+    @Environment(DataStore.self) private var store
+    @Environment(Watchlist.self) private var watchlist
+    @Environment(Notifier.self) private var notifier
+    @Environment(\.openURL) private var openURL
+    @State private var lastTest: String?
+
+    var body: some View {
+        Section {
+            Toggle("Starred games", isOn: Binding(get: { notifier.notifyStarred }, set: { on in enable(on) { notifier.notifyStarred = on } }))
+            Toggle("New game announcements", isOn: Binding(get: { notifier.notifyAnnouncements }, set: { on in enable(on) { notifier.notifyAnnouncements = on } }))
+            if notifier.authorization == .denied && notifier.isEnabled {
+                Button("Notifications are off for NJ Scratch. Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+                .font(.footnote)
+            }
+            #if DEBUG
+            Button("Debug: check the last 3 days now") {
+                Task {
+                    let n = await notifier.check(store: store, watched: Set(watchlist.ids), lookback: 3 * 86_400)
+                    lastTest = "\(n) notification(s) posted"
+                }
+            }
+            if let lastTest { Text(lastTest).font(.footnote).foregroundStyle(.secondary) }
+            #endif
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("Starred games: top or major prizes claimed, the last top prize claimed, and profile changes. iOS checks in the background a few times a day when it can, so alerts may arrive a few hours after the data changes. Nothing leaves your device.")
+        }
+        .task { await notifier.refreshAuthorization() }
+    }
+
+    /// Ask for permission when a toggle is turned on; start from the current data so old changes aren't sent.
+    private func enable(_ on: Bool, apply: @escaping () -> Void) {
+        guard on else { apply(); return }
+        Task {
+            let wasEnabled = notifier.isEnabled
+            if await notifier.requestPermission() {
+                apply()
+                if !wasEnabled { await notifier.markCaughtUp(store: store) }
+            }
+        }
     }
 }
