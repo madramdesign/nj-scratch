@@ -118,7 +118,8 @@ describe('API', () => {
   });
 
   it('marks data stale when it has not been verified recently', async () => {
-    const stale = new DashboardService(db, () => FIXTURE_NOW + 5 * 86_400_000);
+    // Run timestamps are recorded with the real clock, so measure staleness from it.
+    const stale = new DashboardService(db, () => Date.now() + 5 * 86_400_000);
     const { app: a2 } = createApp({ db, service: stale });
     const s = (await (await a2.request('/api/status')).json()) as any;
     expect(s.isStale).toBe(true);
